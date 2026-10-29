@@ -249,6 +249,8 @@ body[data-theme=night][data-scene=year] .orb b{background:linear-gradient(90deg,
 .jc-i{font:500 9.5px/1.2 var(--mono);letter-spacing:.08em;color:#a9cbe6}
 @media(max-width:680px){.jag-credit{left:10px;bottom:10px;padding:6px 10px 7px 9px}.jc-n{font-size:12.5px}.jc-i{font-size:8.5px}}
 @media(max-width:680px){.entry-copy{display:contents}.entry-grid>.portal-wrap{order:1;margin-top:18px;margin-bottom:6px;min-height:calc(min(72vh,540px,(100vw - 56px)*1.5) + 26px)!important}.entry-grid .eyebrow{align-self:flex-start}.entry-button{order:2;margin-top:14px;width:100%}}
+body.ts *:not(.sw):not(.sw *){transition:none!important}
+@media(max-width:680px){.bc{transition:none}}
 .cans{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;opacity:0;transition:opacity .7s}
 body[data-scene=year] .cans{opacity:1}
 .cn{position:absolute;left:var(--x);top:var(--y);height:calc(var(--h)*1vh);aspect-ratio:var(--ar);transform:rotate(var(--r));filter:blur(var(--b));opacity:var(--o)}
@@ -711,6 +713,14 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
     const apply=()=>{body.dataset.theme=on?'night':'day';NT=on?1:0;sw.classList.toggle('night',on);sw.setAttribute('aria-pressed',on?'true':'false');};
     try{localStorage.setItem('cr-theme',on?'night':'day');}catch(_){}
     if(instant){apply();NV=NT;return;}
+    if(matchMedia('(max-width:680px),(pointer:coarse)').matches){
+      /* phones: no full-page view-transition / giant bloom (they cause glitches); quick colour dip instead */
+      const o=document.createElement('div');
+      o.style.cssText='position:fixed;inset:0;z-index:70;pointer-events:none;opacity:0;transition:opacity .16s ease-out;background:'+(on?'#050a18':'#d9ff45');
+      document.body.appendChild(o);body.classList.add('ts');
+      requestAnimationFrame(()=>{o.style.opacity='1';setTimeout(()=>{apply();requestAnimationFrame(()=>{o.style.transition='opacity .35s ease-in';o.style.opacity='0';setTimeout(()=>{o.remove();body.classList.remove('ts');},400);});},180);});
+      return;
+    }
     const R=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y)),b=document.createElement('div');
     b.className='bloom';b.style.cssText='left:'+x+'px;top:'+y+'px;--s:'+(R*2/16);document.body.appendChild(b);setTimeout(()=>b.remove(),1100);
     if(document.startViewTransition&&!REDUCED){const t=document.startViewTransition(apply);
@@ -747,8 +757,8 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
   jagEl.addEventListener('click',()=>{buzz('medium');openCan();});
   jagEl.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openCan();}});
   setTimeout(openCan,1100);setInterval(()=>{if(screenIndex===0)openCan();},8500);
-  (function(){const C=[['b',1,60,34,-14,0,.95,7],['w',88,6,30,16,0,.95,8],['b',82,56,40,11,0,.95,6.5],['w',-2,6,26,-20,1.5,.8,9],['b',43,76,24,24,3,.6,7.5],['w',64,80,22,-8,2,.7,8.5],['b',27,-7,22,196,3,.6,9.5],['w',47,0,17,40,4,.5,6],['b',93,80,26,-26,1,.85,7]];
-    $('#cans').innerHTML=C.map((c,i)=>{const b=c[0]==='b';return '<div class="cn'+(i>3?' hm':'')+'" style="--x:'+c[1]+'%;--y:'+c[2]+'%;--h:'+c[3]+';--r:'+c[4]+'deg;--b:'+c[5]+'px;--o:'+c[6]+';--t:'+c[7]+'s;--i:'+i+';--ar:'+(b?.4405:.4286)+'"><div class="cf"><div class="bc '+(b?'cb"><i class="eye e1"></i><i class="eye e2"></i>':'cw">')+'</div></div></div>';}).join('');})();
+  (function(){const C=[['b',1,60,34,-14,0,.95,7],['w',88,6,30,16,0,.95,8],['b',82,56,40,11,0,.95,6.5],['w',-2,6,26,-20,1.5,.8,9],['b',43,76,24,24,3,.6,7.5],['w',64,80,22,-8,2,.7,8.5],['b',27,-7,22,196,3,.6,9.5],['w',47,0,17,40,4,.5,6],['b',93,80,26,-26,1,.85,7],['w',-6,38,19,-12,1.5,.8,8.5],['b',91,36,19,16,1.5,.8,7.5]];
+    $('#cans').innerHTML=C.map((c,i)=>{const b=c[0]==='b';return '<div class="cn'+(i>4&&i<9?' hm':'')+'" style="--x:'+c[1]+'%;--y:'+c[2]+'%;--h:'+c[3]+';--r:'+c[4]+'deg;--b:'+c[5]+'px;--o:'+c[6]+';--t:'+c[7]+'s;--i:'+i+';--ar:'+(b?.4405:.4286)+'"><div class="cf"><div class="bc '+(b?'cb"><i class="eye e1"></i><i class="eye e2"></i>':'cw">')+'</div></div></div>';}).join('');})();
   function tossCans(){const c=$('#cans');c.classList.remove('in');void c.offsetWidth;c.classList.add('in');}
 })();
 </script>
