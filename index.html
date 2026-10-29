@@ -369,7 +369,7 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
       <p class="w3p">Год прошёл на <b id="yearPct">82.0%</b>. Сугроб за горами растёт вместе с ним.</p>
     </div>
     <div class="w3b">
-      <div class="leaderboard"><div class="leader-heading"><h3>Топ-3 разгадавших</h3><span id="personalBest"></span></div><div class="record-list" id="leaderList"></div><p class="record-note">Демо-записи отмечены отдельно. Личный рекорд хранится только в этом браузере.</p></div>
+      <div class="leaderboard"><div class="leader-heading"><h3>Топ-3 разгадавших</h3><span id="personalBest"></span></div><div class="record-list" id="leaderList"></div><p class="record-note" id="recordNote">Демо-записи отмечены отдельно. Личный рекорд хранится только в этом браузере.</p></div>
       <div class="w3act"><button class="primary" id="replayPuzzle"><span>Пройти загадку снова</span><span class="arr">↻</span></button><button class="secondary" id="backToStart"><span>В начало</span><span>↖</span></button></div>
     </div>
   </div>
@@ -412,6 +412,7 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
     {name:'CLOCKWORK_03',time:24.71,tag:'DEMO',demo:true}
   ];
   let records = loadRecords();
+  let globalTop=null, myGlobal=null;
   let targetDate = new Date(new Date().getFullYear()+1,0,1,0,0,0,0);
 
   function loadRecords(){
@@ -552,8 +553,9 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
     const elapsed=Math.max(.1,(performance.now()-puzzleStartedAt)/1000);
     records.push({name:'YOU / LOCAL',time:Number(elapsed.toFixed(2)),createdAt:Date.now()});
     records=records.sort((a,b)=>a.time-b.time).slice(0,30);saveRecords();
-    $('#modalText').textContent='Ты прошёл все слои за '+elapsed.toFixed(2)+' секунды. Рекорд сохранён локально; глобальный рейтинг подключим позже.';
+    $('#modalText').textContent='Ты прошёл все слои за '+elapsed.toFixed(2)+' секунды. Результат отправлен в общий рейтинг.';
     $('#modal').classList.add('show');
+    submitGlobal(Number(elapsed.toFixed(2)));
   }
   $('#enterGate').addEventListener('click',()=>showScreen(1));
   $('#backHome').addEventListener('click',()=>showScreen(0));
@@ -561,17 +563,35 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
   $('#replayPuzzle').addEventListener('click',()=>showScreen(1));
   $('#backToStart').addEventListener('click',()=>showScreen(0));
 
+  const tgApp=()=>window.Telegram&&window.Telegram.WebApp;
+  async function loadGlobal(){
+    try{const r=await fetch('/api/score',{cache:'no-store'});if(!r.ok)return;const d=await r.json();
+      if(Array.isArray(d.top)){globalTop=d.top;renderLeaderboard();}}catch(_){}
+  }
+  async function submitGlobal(time){
+    const w=tgApp();
+    if(w&&w.initData){
+      try{const r=await fetch('/api/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({time,initData:w.initData})});
+        const d=await r.json();if(r.ok&&d&&d.ok)myGlobal=d;}catch(_){}
+    }
+    await loadGlobal();
+  }
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadGlobal();});
+  loadGlobal();
   function renderLeaderboard(){
-    const combined=[...records.map(r=>({...r,demo:false})),...demoRecords];
+    const useG=Array.isArray(globalTop);
+    const combined=useG?globalTop.map(r=>({name:r.name,time:r.time,demo:false})):[...records.map(r=>({...r,demo:false})),...demoRecords];
     combined.sort((a,b)=>a.time-b.time);
     const top=combined.slice(0,3);
-    $('#leaderList').innerHTML=top.map((r,i)=>{
+    const noteEl=$('#recordNote');if(noteEl)noteEl.textContent=useG?'Реальные результаты игроков Telegram. В рейтинг идёт лучшая попытка каждого.':'Демо-записи отмечены отдельно. Личный рекорд хранится только в этом браузере.';
+    if(useG&&!top.length){$('#leaderList').innerHTML='<div class="record-row"><span class="record-rank">--</span><span class="record-name">Пока никого. Будь первым</span><span class="record-time"></span></div>';}
+    else $('#leaderList').innerHTML=top.map((r,i)=>{
       const label=r.demo ? ' / DEMO' : '';
       const safeName=String(r.name).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       return `<div class="record-row"><span class="record-rank">0${i+1}</span><span class="record-name">${safeName}${label}</span><span class="record-time">${Number(r.time).toFixed(2)}s</span></div>`;
     }).join('');
     const myBest=records.length ? Math.min(...records.map(r=>r.time)) : null;
-    $('#personalBest').textContent=myBest ? 'BEST LOCAL RUN · '+myBest.toFixed(2)+'S' : 'LOCAL RUN · ЗАПИСЬ СОЗДАНА';
+    $('#personalBest').textContent=(useG&&myGlobal&&myGlobal.rank)?('ТВОЁ МЕСТО · #'+myGlobal.rank+' · '+Number(myGlobal.best).toFixed(2)+'S'):(myBest ? 'BEST LOCAL RUN · '+myBest.toFixed(2)+'S' : 'LOCAL RUN · ЗАПИСЬ СОЗДАНА');
   }
   function pad(n,len=2){ return String(n).padStart(len,'0'); }
   function updateCountdown(){
@@ -714,11 +734,9 @@ body[data-theme=night] .eye{animation:eyeOn 1.6s .6s both,eyePulse 2.8s 2.2s eas
     try{localStorage.setItem('cr-theme',on?'night':'day');}catch(_){}
     if(instant){apply();NV=NT;return;}
     if(matchMedia('(max-width:680px),(pointer:coarse)').matches){
-      /* phones: no full-page view-transition / giant bloom (they cause glitches); quick colour dip instead */
-      const o=document.createElement('div');
-      o.style.cssText='position:fixed;inset:0;z-index:70;pointer-events:none;opacity:0;transition:opacity .16s ease-out;background:'+(on?'#050a18':'#d9ff45');
-      document.body.appendChild(o);body.classList.add('ts');
-      requestAnimationFrame(()=>{o.style.opacity='1';setTimeout(()=>{apply();requestAnimationFrame(()=>{o.style.transition='opacity .35s ease-in';o.style.opacity='0';setTimeout(()=>{o.remove();body.classList.remove('ts');},400);});},180);});
+      /* phones: instant switch, no transitions/overlays (they cause artifacts in the webview) */
+      body.classList.add('ts');apply();
+      requestAnimationFrame(()=>requestAnimationFrame(()=>body.classList.remove('ts')));
       return;
     }
     const R=Math.hypot(Math.max(x,innerWidth-x),Math.max(y,innerHeight-y)),b=document.createElement('div');
